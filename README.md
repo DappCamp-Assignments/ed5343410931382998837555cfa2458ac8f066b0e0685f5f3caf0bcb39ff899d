@@ -2,7 +2,7 @@
 
 Kakuro is a type of logic puzzle that is often referred to as "cross sums" or "crosswords with numbers." It is played on a grid that is similar to a crossword puzzle, but instead of words, players must fill in the grid with numbers.
 
-The objective of the game is to fill in each square in the grid with a number from 1 to 9, without repeating any numbers within a row or column. In addition, each row and column is associated with a set of clues - these clues indicate the sum of the numbers that must be placed in the row or column. For example, a clue of "6" for a row with three squares means that the numbers placed in those squares must add up to 6. No number should be repeated in a single run.
+The objective of the game is to fill in each *white* square in the grid with a number from 1 to 9, without repeating any numbers within a row or column. In addition, each row and column is associated with a set of clues - these clues indicate the sum of the numbers that must be placed in the row or column. For example, a clue of "6" for a row with three squares means that the numbers placed in those squares must add up to 6. No number should be repeated in a single run.
 
 Players use a combination of deductive reasoning and trial-and-error to solve the puzzle. They start by looking for squares with only one possible solution, and then use those solutions to eliminate possibilities in other squares. As they progress, they may need to use more complex strategies to deduce the correct solution.
 
