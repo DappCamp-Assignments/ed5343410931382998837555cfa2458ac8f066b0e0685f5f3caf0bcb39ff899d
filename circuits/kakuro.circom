@@ -29,6 +29,7 @@ template Kakuro(size) {
     signal input rowSums[size][3];
     signal input columnSums[size][3];
     signal input solution[size][size];
+    signal output out;
     
     // These are not constraints, these are just assumptions that we need to make while implementing this assignment
     /* 
@@ -48,7 +49,7 @@ template Kakuro(size) {
     validate_size.in <== size;
     validate_size.upper_value <== 5;
     validate_size.out === 1;
-
+    // log("This constraint validate_size.out is valid and has value = ",validate_size.out);
     /* 
         If a box index lies outside the index start_index & end_index, then 
         it is a gray box
@@ -78,6 +79,7 @@ template Kakuro(size) {
                 and so the following constraint must suffice
             */
             validate_cell[i][j].out === 1-is_gray_box[i][j].out;
+            // log("For row i = ",i," and column j= ",j," This constraint validate_cell[",i,"][",j,"].out has value = ",validate_cell[i][j].out);
         }   
     }
 
@@ -100,6 +102,7 @@ template Kakuro(size) {
                 will be 1 and so the rowsum will add that cell value into the sum variable `sum_of_row_values`
             */
             value_contribution_to_rowsum_from_that_index[i][j] <== solution[i][j]*is_empty_box_checker[i][j].out; 
+            // log("For i = ",i," and j= ",j," This constraint value_contribution_to_rowsum_from_that_index[",i,"][",j,"] has value = ",value_contribution_to_rowsum_from_that_index[i][j]);
         }
         /*
             Calculation of the sum of the values for the row `i`
@@ -107,10 +110,12 @@ template Kakuro(size) {
         for(var k=0;k<size;k++){
             sum_of_row_values += value_contribution_to_rowsum_from_that_index[i][k];
         }
+        // log("For row i = ",i," This signal sum_of_row_values has value = ",sum_of_row_values);
         /*
             Calculated sum should be equal to the sum provided for that row
         */
         sum_of_row_values === rowSums[i][2];
+        // log("This constraint sum_of_row_values === rowSums[i][2] is valid here ", sum_of_row_values == rowSums[i][2]);
     }
 
     component is_empty_box_checker_for_columns[size][size];
@@ -125,6 +130,7 @@ template Kakuro(size) {
             is_empty_box_checker_for_columns[i][j].upper_value <== columnSums[j][1];
             
             value_contribution_to_columnsum_from_that_index[i][j] <== solution[i][j]*is_empty_box_checker_for_columns[i][j].out; 
+            // log("For column j = ",j," and row i= ",i," This constraint value_contribution_to_columnsum_from_that_index[",i,"][",j,"] has value = ",value_contribution_to_columnsum_from_that_index[i][j]);
         }
         /*
             Calculation of the sum of the values for the column `j`
@@ -132,10 +138,12 @@ template Kakuro(size) {
         for(var k=0;k<size;k++){
             sum_of_column_values += value_contribution_to_columnsum_from_that_index[k][j];
         }
+        // log("For column j = ",j," This signal sum_of_column_values has value = ",sum_of_column_values);
         /*
             Calculated sum should be equal to the sum provided for that column
         */
         sum_of_column_values === columnSums[j][2];
+        // log("This constraint sum_of_column_values === columnSums[j][2] is valid here ", sum_of_column_values == columnSums[j][2]);
     }
 }
 
