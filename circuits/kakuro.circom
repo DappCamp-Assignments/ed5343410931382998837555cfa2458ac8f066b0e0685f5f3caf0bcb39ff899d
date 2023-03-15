@@ -4,7 +4,10 @@ include "../node_modules/circomlib/circuits/comparators.circom";
 include "../node_modules/circomlib/circuits/gates.circom";
 
 
-
+/* 
+    This function will check whether cell contains value other than 1 to 9.
+    Returns 1 if value lies between 1 to 9 and 0 otherwise
+*/
 template IsInRange(n){
     signal input lower_value;
     signal input in;
@@ -27,17 +30,41 @@ template Kakuro(size) {
     signal input columnSums[size][3];
     signal input solution[size][size];
     
+    // These are not constraints, these are just assumptions that we need to make while implementing this assignment
+    /* 
+        Number of rows and columns are equal 
+        The size of grid will not be greater than 5x5
+        Each row will not have more than one row and column sum clue    
+    */
+
+    /*
+        - NO_NEED: Number of rows and columns are equal - No need to check this as we are passing only one parameter size
+        - NO_NEED: No need to check for "Each row will not have more than one row and column sum clue" 
+        as we have been provided hardcoded value as 3 -  
+    */
+
     component validate_size = IsInRange(3);
     validate_size.lower_value <== 1;
     validate_size.in <== size;
     validate_size.upper_value <== 5;
     validate_size.out === 1;
 
+    /* 
+        If a box index lies outside the index start_index & end_index, then 
+        it is a gray box
+    */
     component is_gray_box[size][size];
+
+    /* 
+        Validate cell values i.e. the cell value should lie between 1 and 9 (both inclusive)
+    */
     component validate_cell[size][size];
     for(var i = 0;i<size;i++){
         for(var j = 0;j<size;j++){
 
+            /*
+                Check whether it is a gray box  
+            */
             is_gray_box[i][j] = IsZero(); // Since these values can be other values as well. we might want to 
             is_gray_box[i][j].in <== solution[i][j];
             
@@ -46,11 +73,17 @@ template Kakuro(size) {
             validate_cell[i][j].lower_value <== 1;
             validate_cell[i][j].in <== solution[i][j];
             validate_cell[i][j].upper_value <== 9;
+            /*
+                If it is a gray box then   validate_cell[i][j].out will be 0 and is_gray_box[i][j].out will be 1 
+                and so the following constraint must suffice
+            */
             validate_cell[i][j].out === 1-is_gray_box[i][j].out;
         }   
     }
 
-
+    /*
+        Validating for sum value for row 
+    */
     component is_empty_box_checker[size][size];
     signal value_contribution_to_rowsum_from_that_index[size][size];
     for (var i = 0;i<size;i++){
@@ -62,11 +95,21 @@ template Kakuro(size) {
             is_empty_box_checker[i][j].in <== j;
             is_empty_box_checker[i][j].upper_value <== rowSums[i][1];
             
+            /*
+                If it is an empty box ( not gray box ) containing valid value then is_empty_box_checker[i][j].out 
+                will be 1 and so the rowsum will add that cell value into the sum variable `sum_of_row_values`
+            */
             value_contribution_to_rowsum_from_that_index[i][j] <== solution[i][j]*is_empty_box_checker[i][j].out; 
         }
+        /*
+            Calculation of the sum of the values for the row `i`
+        */
         for(var k=0;k<size;k++){
             sum_of_row_values += value_contribution_to_rowsum_from_that_index[i][k];
         }
+        /*
+            Calculated sum should be equal to the sum provided for that row
+        */
         sum_of_row_values === rowSums[i][2];
     }
 
@@ -81,11 +124,17 @@ template Kakuro(size) {
             is_empty_box_checker_for_columns[i][j].in <== i;
             is_empty_box_checker_for_columns[i][j].upper_value <== columnSums[j][1];
             
-            value_contribution_to_columnsum_from_that_index[j][i] <== solution[i][j]*is_empty_box_checker_for_columns[i][j].out; 
+            value_contribution_to_columnsum_from_that_index[i][j] <== solution[i][j]*is_empty_box_checker_for_columns[i][j].out; 
         }
+        /*
+            Calculation of the sum of the values for the column `j`
+        */
         for(var k=0;k<size;k++){
-            sum_of_column_values += value_contribution_to_columnsum_from_that_index[j][k];
+            sum_of_column_values += value_contribution_to_columnsum_from_that_index[k][j];
         }
+        /*
+            Calculated sum should be equal to the sum provided for that column
+        */
         sum_of_column_values === columnSums[j][2];
     }
 }
