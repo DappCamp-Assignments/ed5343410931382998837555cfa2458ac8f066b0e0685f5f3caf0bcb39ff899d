@@ -1,11 +1,142 @@
-pragma circom 2.0.3;
+pragma circom 2.1.0;
 
-include "../node_modules/circomlib/circuits/comparators.circom";
-include "../node_modules/circomlib/circuits/gates.circom";
+template AND() {
+    signal input a;
+    signal input b;
+    signal output out;
 
-/*
- * `out` = `cond` ? `L` : `R`
- */
+    out <== a*b;
+}
+
+template OR() {
+    signal input a;
+    signal input b;
+    signal output out;
+
+    out <== a + b - a*b;
+}
+
+template MultiAND(n) {
+    signal input in[n];
+    signal output out;
+    component and1;
+    component and2;
+    component ands[2];
+    if (n==1) {
+        out <== in[0];
+    } else if (n==2) {
+        and1 = AND();
+        and1.a <== in[0];
+        and1.b <== in[1];
+        out <== and1.out;
+    } else {
+        and2 = AND();
+        var n1 = n\2;
+        var n2 = n-n\2;
+        ands[0] = MultiAND(n1);
+        ands[1] = MultiAND(n2);
+        var i;
+        for (i=0; i<n1; i++) ands[0].in[i] <== in[i];
+        for (i=0; i<n2; i++) ands[1].in[i] <== in[n1+i];
+        and2.a <== ands[0].out;
+        and2.b <== ands[1].out;
+        out <== and2.out;
+    }
+}
+template Num2Bits(n) {
+    signal input in;
+    signal output out[n];
+    var lc1=0;
+
+    var e2=1;
+    for (var i = 0; i<n; i++) {
+        out[i] <-- (in >> i) & 1;
+        out[i] * (out[i] -1 ) === 0;
+        lc1 += out[i] * e2;
+        e2 = e2+e2;
+    }
+
+    lc1 === in;
+}
+template IsZero() {
+    signal input in;
+    signal output out;
+
+    signal inv;
+
+    inv <-- in!=0 ? 1/in : 0;
+
+    out <== -in*inv +1;
+    in*out === 0;
+}
+
+
+template IsEqual() {
+    signal input in[2];
+    signal output out;
+
+    component isz = IsZero();
+
+    in[1] - in[0] ==> isz.in;
+
+    isz.out ==> out;
+}
+
+
+
+
+template LessThan(n) {
+    assert(n <= 252);
+    signal input in[2];
+    signal output out;
+
+    component n2b = Num2Bits(n+1);
+
+    n2b.in <== in[0]+ (1<<n) - in[1];
+
+    out <== 1-n2b.out[n];
+}
+
+
+
+// N is the number of bits the input  have.
+// The MSF is the sign bit.
+template LessEqThan(n) {
+    signal input in[2];
+    signal output out;
+
+    component lt = LessThan(n);
+
+    lt.in[0] <== in[0];
+    lt.in[1] <== in[1]+1;
+    lt.out ==> out;
+}
+
+// N is the number of bits the input  have.
+// The MSF is the sign bit.
+template GreaterThan(n) {
+    signal input in[2];
+    signal output out;
+
+    component lt = LessThan(n);
+
+    lt.in[0] <== in[1];
+    lt.in[1] <== in[0];
+    lt.out ==> out;
+}
+
+// N is the number of bits the input  have.
+// The MSF is the sign bit.
+template GreaterEqThan(n) {
+    signal input in[2];
+    signal output out;
+
+    component lt = LessThan(n);
+
+    lt.in[0] <== in[1];
+    lt.in[1] <== in[0]+1;
+    lt.out ==> out;
+}
 
 template IfThenElse() {
     signal input cond;
@@ -42,7 +173,7 @@ template areDistinctNumbers(){
     // numbers are equal (because skip is set to 1 only when the numbers is zero) or not we will just mark it as they were different
     // and so the answer is 1 always
     out <== if_else_executor.out;
-    log("in[0] => ",in[0]);
+    /* log("in[0] => ",in[0]);
     log("in[1] => ",in[1]);
     log("skip => ",skip);
     log("++++++++++");
@@ -50,7 +181,7 @@ template areDistinctNumbers(){
     log("if_else_executor.L => ",1 - two_numbers_equal.out);
     log("if_else_executor.R => ", if_else_executor.R);
     log("if_else_executor.out => ", if_else_executor.out);
-    log("----------");
+    log("----------"); */
 
     
 }
@@ -86,7 +217,7 @@ template AreNumbersUnique(size){
             isNumberZero[i][j] = IsZero();
             isNumberZero[i][j].in <== numbers[j];
             
-            log("when i => ",i," and j => ",j);
+            // log("when i => ",i," and j => ",j);
             areNumbersDistinct[i][j] = areDistinctNumbers();
             areNumbersDistinct[i][j].in[0] <== numbers[i];
             areNumbersDistinct[i][j].in[1] <== numbers[j];
@@ -130,6 +261,90 @@ template IsInRange(n){
     out <== greater_than_equal_to_lower.out * less_than_equal_to_upper.out;
 }
 
+template RowCellsContainsValidValue(size,n){
+    signal input numbers[size];
+    signal output out;
+
+    component is_gray_box[size];
+    component validate_cell[size];
+    component validation_status[size];
+    signal validation_status_result[size];
+    for(var i =0;i<size;i++){
+        is_gray_box[i] = IsZero(); // Since these values can be other values as well. we might want to 
+        is_gray_box[i].in <== numbers[i];
+        
+
+        validate_cell[i] = IsInRange(n);
+        validate_cell[i].lower_value <== 1;
+        validate_cell[i].in <== numbers[i];
+        validate_cell[i].upper_value <== 9;
+
+        validation_status[i] = OR();
+        validation_status[i].a <== is_gray_box[i].out;
+        validation_status[i].b <== validate_cell[i].out;
+
+        validation_status_result[i] <== validation_status[i].out;
+    }
+    component multi_and = MultiAND(size);
+    multi_and.in <== validation_status_result;
+    out <==  multi_and.out;
+}
+
+
+template ValidSum (size) {
+    signal input numbers[size];
+    signal input sumConstraint[3];
+    signal output out;
+
+    component is_number_within_range[size];
+    signal contribution_to_sum_from_ith_cell[size];
+
+    for(var i =0;i<size;i++){
+        
+        is_number_within_range[i] = IsInRange(4);
+        is_number_within_range[i].lower_value <== 1;
+        is_number_within_range[i].in <== numbers[i];
+        is_number_within_range[i].upper_value <== 9;
+        
+        contribution_to_sum_from_ith_cell[i] <== is_number_within_range[i].out * numbers[i];
+    }
+
+    var sum =0;
+    for(var i=0;i<size;i++){
+        sum+=contribution_to_sum_from_ith_cell[i];
+    }
+    component is_sum_equal = IsEqual();
+    is_sum_equal.in[0] <== sum;
+    is_sum_equal.in[1] <== sumConstraint[2];
+
+    component are_numbers_unique = AreNumbersUnique(size);
+    are_numbers_unique.numbers <== numbers;
+    // are_numbers_unique.out === 1;
+
+    out <== is_sum_equal.out * are_numbers_unique.out;
+}
+
+template WholeCellContainsValidValue(size,n){
+    signal input whole_data[size][size];
+    signal output out;
+
+    component one_row_validation[size];
+    signal result_of_one_row_validation[size];
+    for (var i =0;i<size;i++){
+        one_row_validation[i] = RowCellsContainsValidValue(size,n);
+        for(var k=0;k<size;k++){
+            one_row_validation[i].numbers[k] <== whole_data[i][k];
+        }
+        result_of_one_row_validation[i] <== one_row_validation[i].out;
+    }
+    /* for(var i =0;i<size;i++){
+        log("for i => ",i," validation status is ",result_of_one_row_validation[i]);
+    } */
+    component multi_and = MultiAND(n);
+    multi_and.in <== result_of_one_row_validation;
+    out <== multi_and.out;
+}
+
 template Kakuro(size) {
     signal input rowSums[size][3];
     signal input columnSums[size][3];
@@ -164,116 +379,75 @@ template Kakuro(size) {
     /* 
         Validate cell values i.e. the cell value should lie between 1 and 9 (both inclusive)
     */
-    component validate_cell[size][size];
-    for(var i = 0;i<size;i++){
-        for(var j = 0;j<size;j++){
-
-            /*
-                Check whether it is a gray box  
-            */
-            is_gray_box[i][j] = IsZero(); // Since these values can be other values as well. we might want to 
-            is_gray_box[i][j].in <== solution[i][j];
-            
-
-            validate_cell[i][j] = IsInRange(4);
-            validate_cell[i][j].lower_value <== 1;
-            validate_cell[i][j].in <== solution[i][j];
-            validate_cell[i][j].upper_value <== 9;
-            /*
-                If it is a gray box then   validate_cell[i][j].out will be 0 and is_gray_box[i][j].out will be 1 
-                and so the following constraint must suffice
-            */
-            validate_cell[i][j].out === 1-is_gray_box[i][j].out;
-            // log("For row i = ",i," and column j= ",j," This constraint validate_cell[",i,"][",j,"].out has value = ",validate_cell[i][j].out);
-        }   
-    }
+    component validate_cells = WholeCellContainsValidValue(size,5);// 5 if you wish to enter number greater than 15
+    validate_cells.whole_data <== solution;
+    // log("validate_cell.out ", validate_cells.out);
 
     /*
         Validating for sum value for row 
     */
-    component is_empty_box_checker[size][size];
-    signal value_contribution_to_rowsum_from_that_index[size][size];
-    component is_rowsum_equal[size];
-    component are_numbers_unique_rows[size];
 
-    signal sub_row_array[size][size];
-    for (var i = 0;i<size;i++){
-        var sum_of_row_values = 0;
-        
-        for(var j = 0;j<size;j++){
-
-            is_empty_box_checker[i][j] = IsInRange(4);
-            is_empty_box_checker[i][j].lower_value <== rowSums[i][0];
-            is_empty_box_checker[i][j].in <== j;
-            is_empty_box_checker[i][j].upper_value <== rowSums[i][1];
-            
-            /*
-                If it is an empty box ( not gray box ) containing valid value then is_empty_box_checker[i][j].out 
-                will be 1 and so the rowsum will add that cell value into the sum variable `sum_of_row_values`
-            */
-            value_contribution_to_rowsum_from_that_index[i][j] <== solution[i][j]*is_empty_box_checker[i][j].out; 
-            // log("For i = ",i," and j= ",j," This constraint value_contribution_to_rowsum_from_that_index[",i,"][",j,"] has value = ",value_contribution_to_rowsum_from_that_index[i][j]);
-            sub_row_array[i][j] <== solution[i][j];
+    component is_valid_sum_across_row[size];
+    var one_row_at_a_time[size];
+    signal results_of_sum_constraints_on_row[size];
+    for(var i=0;i<size;i++){
+        for(var j=0;j<size;j++){
+            one_row_at_a_time[j] = solution[i][j];
         }
-        /*
-            Calculation of the sum of the values for the row `i`
-        */
-        for(var k=0;k<size;k++){
-            sum_of_row_values += value_contribution_to_rowsum_from_that_index[i][k];
-        }
-        // log("For row i = ",i," This signal sum_of_row_values has value = ",sum_of_row_values);
-        /*
-            Calculated sum should be equal to the sum provided for that row
-        */
-        is_rowsum_equal[i] = IsEqual();
-        is_rowsum_equal[i].in[0] <== sum_of_row_values;
-        is_rowsum_equal[i].in[1] <== rowSums[i][2];
-
-        are_numbers_unique_rows[i] = AreNumbersUnique(size);
-        are_numbers_unique_rows[i].numbers <== sub_row_array[i];
-        are_numbers_unique_rows[i].out === 1;
-        // log("This constraint sum_of_row_values === rowSums[i][2] is valid here ", sum_of_row_values == rowSums[i][2]);
+        is_valid_sum_across_row[i] = ValidSum(size);
+        is_valid_sum_across_row[i].numbers <== one_row_at_a_time;
+        is_valid_sum_across_row[i].sumConstraint <== rowSums[i];
+        results_of_sum_constraints_on_row[i] <== is_valid_sum_across_row[i].out;
     }
+    component multi_and_on_row = MultiAND(5);
+    multi_and_on_row.in <== results_of_sum_constraints_on_row;
 
-    component is_empty_box_checker_for_columns[size][size];
-    signal value_contribution_to_columnsum_from_that_index[size][size];
-    component is_columnsum_equal[size];
 
-    component are_numbers_unique_column[size];
-    signal sub_column_array[size][size];
-
-    for (var j = 0;j<size;j++){
-        var sum_of_column_values = 0;
-        for(var i = 0;i<size;i++){
-
-            is_empty_box_checker_for_columns[i][j] = IsInRange(4);
-            is_empty_box_checker_for_columns[i][j].lower_value <== columnSums[j][0];
-            is_empty_box_checker_for_columns[i][j].in <== i;
-            is_empty_box_checker_for_columns[i][j].upper_value <== columnSums[j][1];
-            
-            value_contribution_to_columnsum_from_that_index[i][j] <== solution[i][j]*is_empty_box_checker_for_columns[i][j].out; 
-            // log("For column j = ",j," and row i= ",i," This constraint value_contribution_to_columnsum_from_that_index[",i,"][",j,"] has value = ",value_contribution_to_columnsum_from_that_index[i][j]);
-            sub_column_array[j][i] <== solution[i][j];
+    component is_valid_sum_across_columns[size];
+    var one_column_at_a_time[size];
+    signal results_of_sum_constraints_on_column[size];
+    for(var j=0;j<size;j++){
+        for(var i=0;i<size;i++){
+            one_column_at_a_time[i] = solution[i][j];
         }
-        /*
-            Calculation of the sum of the values for the column `j`
-        */
-        for(var k=0;k<size;k++){
-            sum_of_column_values += value_contribution_to_columnsum_from_that_index[k][j];
-        }
-        // log("For column j = ",j," This signal sum_of_column_values has value = ",sum_of_column_values);
-        /*
-            Calculated sum should be equal to the sum provided for that column
-        */
-        is_columnsum_equal[j] = IsEqual();
-        is_columnsum_equal[j].in[0] <== sum_of_column_values;
-        is_columnsum_equal[j].in[1] <== columnSums[j][2];
-        
-        are_numbers_unique_column[j] = AreNumbersUnique(size);
-        are_numbers_unique_column[j].numbers <== sub_column_array[j];
-        are_numbers_unique_column[j].out === 1;
-        // log("This constraint sum_of_column_values === columnSums[j][2] is valid here ", sum_of_column_values == columnSums[j][2]);
+        is_valid_sum_across_columns[j] = ValidSum(size);
+        is_valid_sum_across_columns[j].numbers <== one_column_at_a_time;
+        is_valid_sum_across_columns[j].sumConstraint <== columnSums[j];
+        results_of_sum_constraints_on_column[j] <== is_valid_sum_across_columns[j].out;
     }
+    component multi_and_on_column = MultiAND(5);
+    multi_and_on_column.in <== results_of_sum_constraints_on_column;
+
+    signal valid_across_row_and_column <== multi_and_on_row.out * multi_and_on_column.out;
+
+    out <== validate_cells.out * valid_across_row_and_column;
+    
+
+    
 }
 
 component main { public [rowSums, columnSums] } = Kakuro(5);
+
+/* INPUT = {
+    "rowSums" : [
+        [0, 0, 0],
+        [1, 2, 11],
+        [1, 3, 19],
+        [2, 4, 16],
+        [3, 4, 17]
+    ],
+    "columnSums" : [
+        [0, 0, 0],
+        [1, 2, 17],
+        [1, 3, 6],
+        [2, 4, 23],
+        [3, 4, 17]
+    ],
+    "solution": [
+        [0, 0, 0, 0, 0],
+        [0, 8, 3, 0, 0],
+        [0, 9, 2, 8, 0],
+        [0, 0, 1, 6, 9],
+        [0, 0, 0, 9, 8]
+    ]
+  } */
