@@ -11,7 +11,10 @@ template IfThenElse() {
 
     out <== cond * (L - R) + R;
 }
-
+/*
+    It takes two numbers `in[0]` , `in[1]` and a parameter `skip` which when set to 1, skips checking the numbers
+    Returns 1 if the numbers are distinct or skip is set to 1, 0 otherwise
+*/
 template areDistinctNumbers(){
     signal input in[2]; // Takes two numbers
     signal input skip; // Check whether to skip comparing numbers,if yes then return 1 i.e. they are distinct
@@ -38,37 +41,21 @@ template areDistinctNumbers(){
     // numbers are equal (because skip is set to 1 only when the numbers is zero) or not we will just mark it as they were different
     // and so the answer is 1 always
     out <== if_else_executor.out;
-    /* log("in[0] => ",in[0]);
-    log("in[1] => ",in[1]);
-    log("skip => ",skip);
-    log("++++++++++");
-    log("is_skip_zero.out => ",is_skip_zero.out); // when skip is disabled
-    log("if_else_executor.L => ",1 - two_numbers_equal.out);
-    log("if_else_executor.R => ", if_else_executor.R);
-    log("if_else_executor.out => ", if_else_executor.out);
-    log("----------"); */
 }
 
+/*  
+    Given a list it returns 1 if all the numbers in the list are unique ( or 0), 0 otherwise
+*/
 template AreNumbersUnique(size){
     signal input numbers[size];
     signal output out;
 
     component areNumbersDistinct[size][size];
     component isNumberZero[size][size];
-    component if_else_checker[size][size];
-    component and[size][size];
-    // signal xor[size][size];
-    /* and[0][0] = AND();
-    and[0][0].a <== 1; // if we initialise it with 1 then we will be sure that all numbers are distinct if xor[4][4] is 0
-    and[0][0].b <== 1; // dummy data for using and[i][j-1] */
-    component isIzero[size];
-    component isIzero_if_else[size];
 
     signal distinct_numbers_output[size][size];
     component multiand[size];
     signal multi_and_output_storage_variable[size];
-    component if_else_for_j_not_equal_to_i[size][size];
-    // [0, 8, 8, 0, 0]
     for(var i=0;i<size;i++){
         distinct_numbers_output[i][i] <== 1;
         for(var j=i+1;j<size;j++){
@@ -80,11 +67,12 @@ template AreNumbersUnique(size){
             isNumberZero[i][j] = IsZero();
             isNumberZero[i][j].in <== numbers[j];
             
-            // log("when i => ",i," and j => ",j);
             areNumbersDistinct[i][j] = areDistinctNumbers();
             areNumbersDistinct[i][j].in[0] <== numbers[i];
             areNumbersDistinct[i][j].in[1] <== numbers[j];
-            areNumbersDistinct[i][j].skip <== isNumberZero[i][j].out; // If the number numbers[j] is zero then out will be 1 
+
+            // If the number numbers[j] is zero then out should be 1 
+            areNumbersDistinct[i][j].skip <== isNumberZero[i][j].out; 
 
 
             distinct_numbers_output[i][j] <== areNumbersDistinct[i][j].out;
@@ -96,15 +84,15 @@ template AreNumbersUnique(size){
         }
         multi_and_output_storage_variable[i] <== multiand[i].out;
     }
-    component multi_of_multi = MultiAND(size);
-    multi_of_multi.in <== multi_and_output_storage_variable;
-    out <== multi_of_multi.out; // if the xor is zero that means either all the numbers were equal or all the numbers different
+    component multi_and_of_multi_and = MultiAND(size);
+    multi_and_of_multi_and.in <== multi_and_output_storage_variable;
+    out <== multi_and_of_multi_and.out; // if the AND is zero that means some of the numbers were equal
 
 }
 
 
 /* 
-    This function will check whether cell contains value other than 1 to 9.
+    This circuit will check whether cell contains value other than 1 to 9.
     Returns 1 if value lies between 1 to 9 and 0 otherwise
 */
 template IsInRange(n){
@@ -124,36 +112,10 @@ template IsInRange(n){
     out <== greater_than_equal_to_lower.out * less_than_equal_to_upper.out;
 }
 
-template RowCellsContainsValidValue(size,n){
-    signal input numbers[size];
-    signal output out;
-
-    component is_gray_box[size];
-    component validate_cell[size];
-    component validation_status[size];
-    signal validation_status_result[size];
-    for(var i =0;i<size;i++){
-        is_gray_box[i] = IsZero(); 
-        is_gray_box[i].in <== numbers[i];
-        
-
-        validate_cell[i] = IsInRange(n);
-        validate_cell[i].lower_value <== 1;
-        validate_cell[i].in <== numbers[i];
-        validate_cell[i].upper_value <== 9;
-
-        validation_status[i] = OR();
-        validation_status[i].a <== is_gray_box[i].out;
-        validation_status[i].b <== validate_cell[i].out;
-
-        validation_status_result[i] <== validation_status[i].out;
-    }
-    component multi_and = MultiAND(size);
-    multi_and.in <== validation_status_result;
-    out <==  multi_and.out;
-}
-
-
+/* 
+    This circuit will check whether sum of cell values contain valid sum as constrained by the input
+    Returns 1 if sum of the filled solution cells is equal to the sum constrained by the input in a given row/column of array
+*/
 template ValidSum (size) {
     signal input numbers[size];
     signal input sumConstraint[3];
@@ -185,7 +147,42 @@ template ValidSum (size) {
 
     out <== is_sum_equal.out * are_numbers_unique.out;
 }
+/* 
+    This circuit will check whether all cells have valid numbers or not
+    Returns 1 all the cells of the row have valid elements
+*/
+template RowCellsContainsValidValue(size,n){
+    signal input numbers[size];
+    signal output out;
 
+    component is_gray_box[size];
+    component validate_cell[size];
+    component validation_status[size];
+    signal validation_status_result[size];
+    for(var i =0;i<size;i++){
+        is_gray_box[i] = IsZero(); 
+        is_gray_box[i].in <== numbers[i];
+        
+
+        validate_cell[i] = IsInRange(n);
+        validate_cell[i].lower_value <== 1;
+        validate_cell[i].in <== numbers[i];
+        validate_cell[i].upper_value <== 9;
+
+        validation_status[i] = OR();
+        validation_status[i].a <== is_gray_box[i].out;
+        validation_status[i].b <== validate_cell[i].out;
+
+        validation_status_result[i] <== validation_status[i].out;
+    }
+    component multi_and = MultiAND(size);
+    multi_and.in <== validation_status_result;
+    out <==  multi_and.out;
+}
+/*  
+    This circuit will use the circuit `RowCellsContainsValidValue` repeatedly on each row and check for invalid cells.
+    Returns 1 if no solution cell has invalid cell
+*/
 template WholeCellContainsValidValue(size,n){
     signal input whole_data[size][size];
     signal output out;
@@ -209,39 +206,22 @@ template Kakuro(size) {
     signal input columnSums[size][3];
     signal input solution[size][size];
     signal output out;
-    
-    // These are not constraints, these are just assumptions that we need to make while implementing this assignment
-    /* 
-        Number of rows and columns are equal 
-        The size of grid will not be greater than 5x5
-        Each row will not have more than one row and column sum clue    
-    */
 
     /*
-        - NO_NEED: Number of rows and columns are equal - No need to check this as we are passing only one parameter size
-        - NO_NEED: No need to check for "Each row will not have more than one row and column sum clue" 
-        as we have been provided hardcoded value as 3 -  
+        Checking whether the size is between 1 and 5 only, It is not a constraint though 
     */
-
     component validate_size = IsInRange(3);
     validate_size.lower_value <== 1;
     validate_size.in <== size;
     validate_size.upper_value <== 5;
     validate_size.out === 1;
-    // log("This constraint validate_size.out is valid and has value = ",validate_size.out);
-    /* 
-        If a box index lies outside the index start_index & end_index, then 
-        it is a gray box
-    */
-    component is_gray_box[size][size];
 
     /* 
         Validate cell values i.e. the cell value should lie between 1 and 9 (both inclusive)
     */
-    component validate_cells = WholeCellContainsValidValue(size,5);// 5 if you wish to enter number greater than 15
+    component validate_cells = WholeCellContainsValidValue(size,5);
     validate_cells.whole_data <== solution;
-    // log("validate_cell.out ", validate_cells.out);
-
+    validate_cells.out === 1;
     /*
         Validating for sum value for row 
     */
@@ -260,7 +240,7 @@ template Kakuro(size) {
     }
     component multi_and_on_row = MultiAND(5);
     multi_and_on_row.in <== results_of_sum_constraints_on_row;
-
+    multi_and_on_row.out === 1;
 
     component is_valid_sum_across_columns[size];
     var one_column_at_a_time[size];
@@ -276,11 +256,12 @@ template Kakuro(size) {
     }
     component multi_and_on_column = MultiAND(5);
     multi_and_on_column.in <== results_of_sum_constraints_on_column;
+    multi_and_on_row.out === 1;
 
-    signal valid_across_row_and_column <== multi_and_on_row.out * multi_and_on_column.out;
-    // valid_across_row_and_column === 1;
-    out <-- validate_cells.out * valid_across_row_and_column;
+    signal valid_sum_across_row_and_column <== multi_and_on_row.out * multi_and_on_column.out;
+    out <== validate_cells.out * valid_sum_across_row_and_column;
     out === 1;
+    
 }
 
 component main { public [rowSums, columnSums,solution] } = Kakuro(5);
