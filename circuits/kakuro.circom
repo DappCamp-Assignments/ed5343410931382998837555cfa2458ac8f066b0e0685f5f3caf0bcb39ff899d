@@ -1,142 +1,7 @@
-pragma circom 2.1.0;
+pragma circom 2.1.4;
 
-template AND() {
-    signal input a;
-    signal input b;
-    signal output out;
-
-    out <== a*b;
-}
-
-template OR() {
-    signal input a;
-    signal input b;
-    signal output out;
-
-    out <== a + b - a*b;
-}
-
-template MultiAND(n) {
-    signal input in[n];
-    signal output out;
-    component and1;
-    component and2;
-    component ands[2];
-    if (n==1) {
-        out <== in[0];
-    } else if (n==2) {
-        and1 = AND();
-        and1.a <== in[0];
-        and1.b <== in[1];
-        out <== and1.out;
-    } else {
-        and2 = AND();
-        var n1 = n\2;
-        var n2 = n-n\2;
-        ands[0] = MultiAND(n1);
-        ands[1] = MultiAND(n2);
-        var i;
-        for (i=0; i<n1; i++) ands[0].in[i] <== in[i];
-        for (i=0; i<n2; i++) ands[1].in[i] <== in[n1+i];
-        and2.a <== ands[0].out;
-        and2.b <== ands[1].out;
-        out <== and2.out;
-    }
-}
-template Num2Bits(n) {
-    signal input in;
-    signal output out[n];
-    var lc1=0;
-
-    var e2=1;
-    for (var i = 0; i<n; i++) {
-        out[i] <-- (in >> i) & 1;
-        out[i] * (out[i] -1 ) === 0;
-        lc1 += out[i] * e2;
-        e2 = e2+e2;
-    }
-
-    lc1 === in;
-}
-template IsZero() {
-    signal input in;
-    signal output out;
-
-    signal inv;
-
-    inv <-- in!=0 ? 1/in : 0;
-
-    out <== -in*inv +1;
-    in*out === 0;
-}
-
-
-template IsEqual() {
-    signal input in[2];
-    signal output out;
-
-    component isz = IsZero();
-
-    in[1] - in[0] ==> isz.in;
-
-    isz.out ==> out;
-}
-
-
-
-
-template LessThan(n) {
-    assert(n <= 252);
-    signal input in[2];
-    signal output out;
-
-    component n2b = Num2Bits(n+1);
-
-    n2b.in <== in[0]+ (1<<n) - in[1];
-
-    out <== 1-n2b.out[n];
-}
-
-
-
-// N is the number of bits the input  have.
-// The MSF is the sign bit.
-template LessEqThan(n) {
-    signal input in[2];
-    signal output out;
-
-    component lt = LessThan(n);
-
-    lt.in[0] <== in[0];
-    lt.in[1] <== in[1]+1;
-    lt.out ==> out;
-}
-
-// N is the number of bits the input  have.
-// The MSF is the sign bit.
-template GreaterThan(n) {
-    signal input in[2];
-    signal output out;
-
-    component lt = LessThan(n);
-
-    lt.in[0] <== in[1];
-    lt.in[1] <== in[0];
-    lt.out ==> out;
-}
-
-// N is the number of bits the input  have.
-// The MSF is the sign bit.
-template GreaterEqThan(n) {
-    signal input in[2];
-    signal output out;
-
-    component lt = LessThan(n);
-
-    lt.in[0] <== in[1];
-    lt.in[1] <== in[0]+1;
-    lt.out ==> out;
-}
+include "circomlib/comparators.circom";
+include "circomlib/gates.circom";
 
 template IfThenElse() {
     signal input cond;
@@ -270,7 +135,7 @@ template RowCellsContainsValidValue(size,n){
     component validation_status[size];
     signal validation_status_result[size];
     for(var i =0;i<size;i++){
-        is_gray_box[i] = IsZero(); // Since these values can be other values as well. we might want to 
+        is_gray_box[i] = IsZero(); 
         is_gray_box[i].in <== numbers[i];
         
 
@@ -319,7 +184,6 @@ template ValidSum (size) {
 
     component are_numbers_unique = AreNumbersUnique(size);
     are_numbers_unique.numbers <== numbers;
-    // are_numbers_unique.out === 1;
 
     out <== is_sum_equal.out * are_numbers_unique.out;
 }
@@ -337,9 +201,6 @@ template WholeCellContainsValidValue(size,n){
         }
         result_of_one_row_validation[i] <== one_row_validation[i].out;
     }
-    /* for(var i =0;i<size;i++){
-        log("for i => ",i," validation status is ",result_of_one_row_validation[i]);
-    } */
     component multi_and = MultiAND(n);
     multi_and.in <== result_of_one_row_validation;
     out <== multi_and.out;
@@ -421,12 +282,9 @@ template Kakuro(size) {
     signal valid_across_row_and_column <== multi_and_on_row.out * multi_and_on_column.out;
 
     out <== validate_cells.out * valid_across_row_and_column;
-    
-
-    
 }
 
-component main { public [rowSums, columnSums] } = Kakuro(5);
+component main { public [rowSums, columnSums,solution] } = Kakuro(5);
 
 /* INPUT = {
     "rowSums" : [
