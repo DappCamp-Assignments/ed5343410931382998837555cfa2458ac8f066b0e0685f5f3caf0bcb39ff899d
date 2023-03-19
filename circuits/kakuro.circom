@@ -1,7 +1,7 @@
-pragma circom 2.1.4;
+pragma circom 2.1.0;
 
-include "circomlib/comparators.circom";
-include "circomlib/gates.circom";
+include "../node_modules/circomlib/circuits/comparators.circom";
+include "../node_modules/circomlib/circuits/gates.circom";
 
 template IfThenElse() {
     signal input cond;
@@ -47,8 +47,6 @@ template areDistinctNumbers(){
     log("if_else_executor.R => ", if_else_executor.R);
     log("if_else_executor.out => ", if_else_executor.out);
     log("----------"); */
-
-    
 }
 
 template AreNumbersUnique(size){
@@ -280,8 +278,9 @@ template Kakuro(size) {
     multi_and_on_column.in <== results_of_sum_constraints_on_column;
 
     signal valid_across_row_and_column <== multi_and_on_row.out * multi_and_on_column.out;
-
-    out <== validate_cells.out * valid_across_row_and_column;
+    // valid_across_row_and_column === 1;
+    out <-- validate_cells.out * valid_across_row_and_column;
+    out === 1;
 }
 
 component main { public [rowSums, columnSums,solution] } = Kakuro(5);
