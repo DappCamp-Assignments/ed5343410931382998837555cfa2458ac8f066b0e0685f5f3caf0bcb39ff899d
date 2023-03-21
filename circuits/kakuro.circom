@@ -2,6 +2,7 @@ pragma circom 2.1.0;
 
 include "../node_modules/circomlib/circuits/comparators.circom";
 include "../node_modules/circomlib/circuits/gates.circom";
+include "../node_modules/circomlib/circuits/switcher.circom";
 
 template IfThenElse() {
     signal input cond;
@@ -15,7 +16,7 @@ template IfThenElse() {
     It takes two numbers `in[0]` , `in[1]` and a parameter `skip` which when set to 1, skips checking the numbers
     Returns 1 if the numbers are distinct or skip is set to 1, 0 otherwise
 */
-template areDistinctNumbers(){
+template AreDistinctNumbers(){
     signal input in[2]; // Takes two numbers
     signal input skip; // Check whether to skip comparing numbers,if yes then return 1 i.e. they are distinct
     signal output out;
@@ -31,7 +32,7 @@ template areDistinctNumbers(){
     two_numbers_equal.in[0] <== in[0];
     two_numbers_equal.in[1] <== in[1];
 
-    component if_else_executor = IfThenElse();
+    /* component if_else_executor = IfThenElse();
 
     if_else_executor.cond <== is_skip_zero.out; // if skip is zero then the output `skip_check.out` should be 1 and hence the 
     // the result should be based on whether the numbers are equal or not. 
@@ -40,7 +41,13 @@ template areDistinctNumbers(){
     if_else_executor.R <==  1; // value of `out` when skip will be 1 i.e.`skip_check.out` to be 0, then it does not matter if the 
     // numbers are equal (because skip is set to 1 only when the numbers is zero) or not we will just mark it as they were different
     // and so the answer is 1 always
-    out <== if_else_executor.out;
+    out <== if_else_executor.out; */
+
+    component switcher = Switcher();
+    switcher.sel <== is_skip_zero.out;
+    switcher.L <== 1 - two_numbers_equal.out;
+    switcher.R <== 1;
+    out <== switcher.outR;
 }
 
 /*  
@@ -67,7 +74,7 @@ template AreNumbersUnique(size){
             isNumberZero[i][j] = IsZero();
             isNumberZero[i][j].in <== numbers[j];
             
-            areNumbersDistinct[i][j] = areDistinctNumbers();
+            areNumbersDistinct[i][j] = AreDistinctNumbers();
             areNumbersDistinct[i][j].in[0] <== numbers[i];
             areNumbersDistinct[i][j].in[1] <== numbers[j];
 
@@ -173,11 +180,12 @@ template RowCellsContainsValidValue(size,n){
         validation_status[i].a <== is_gray_box[i].out;
         validation_status[i].b <== validate_cell[i].out;
 
-        validation_status_result[i] <== validation_status[i].out;
+        validation_status[i].out === 1;
     }
-    component multi_and = MultiAND(size);
+    /* component multi_and = MultiAND(size);
     multi_and.in <== validation_status_result;
-    out <==  multi_and.out;
+    out <==  multi_and.out; */
+    out <== 1;
 }
 /*  
     This circuit will use the circuit `RowCellsContainsValidValue` repeatedly on each row and check for invalid cells.
@@ -188,17 +196,18 @@ template WholeCellContainsValidValue(size,n){
     signal output out;
 
     component one_row_validation[size];
-    signal result_of_one_row_validation[size];
+    /* signal result_of_one_row_validation[size]; */
     for (var i =0;i<size;i++){
         one_row_validation[i] = RowCellsContainsValidValue(size,n);
         for(var k=0;k<size;k++){
             one_row_validation[i].numbers[k] <== whole_data[i][k];
         }
-        result_of_one_row_validation[i] <== one_row_validation[i].out;
+        one_row_validation[i].out === 1;
     }
-    component multi_and = MultiAND(n);
+    /* component multi_and = MultiAND(n);
     multi_and.in <== result_of_one_row_validation;
-    out <== multi_and.out;
+    out <== multi_and.out; */
+    out <== 1;
 }
 
 template Kakuro(size) {
@@ -228,7 +237,7 @@ template Kakuro(size) {
 
     component is_valid_sum_across_row[size];
     var one_row_at_a_time[size];
-    signal results_of_sum_constraints_on_row[size];
+    /* signal results_of_sum_constraints_on_row[size]; */
     for(var i=0;i<size;i++){
         for(var j=0;j<size;j++){
             one_row_at_a_time[j] = solution[i][j];
@@ -236,15 +245,16 @@ template Kakuro(size) {
         is_valid_sum_across_row[i] = ValidSum(size);
         is_valid_sum_across_row[i].numbers <== one_row_at_a_time;
         is_valid_sum_across_row[i].sumConstraint <== rowSums[i];
-        results_of_sum_constraints_on_row[i] <== is_valid_sum_across_row[i].out;
+        is_valid_sum_across_row[i].out === 1;
+        /* results_of_sum_constraints_on_row[i] <== is_valid_sum_across_row[i].out; */
     }
-    component multi_and_on_row = MultiAND(5);
+    /* component multi_and_on_row = MultiAND(5);
     multi_and_on_row.in <== results_of_sum_constraints_on_row;
-    multi_and_on_row.out === 1;
+    multi_and_on_row.out === 1; */
 
     component is_valid_sum_across_columns[size];
     var one_column_at_a_time[size];
-    signal results_of_sum_constraints_on_column[size];
+    /* signal results_of_sum_constraints_on_column[size]; */
     for(var j=0;j<size;j++){
         for(var i=0;i<size;i++){
             one_column_at_a_time[i] = solution[i][j];
@@ -252,15 +262,16 @@ template Kakuro(size) {
         is_valid_sum_across_columns[j] = ValidSum(size);
         is_valid_sum_across_columns[j].numbers <== one_column_at_a_time;
         is_valid_sum_across_columns[j].sumConstraint <== columnSums[j];
-        results_of_sum_constraints_on_column[j] <== is_valid_sum_across_columns[j].out;
+        is_valid_sum_across_columns[j].out === 1;
+        /* results_of_sum_constraints_on_column[j] <== is_valid_sum_across_columns[j].out; */
     }
-    component multi_and_on_column = MultiAND(5);
+    /* component multi_and_on_column = MultiAND(5);
     multi_and_on_column.in <== results_of_sum_constraints_on_column;
-    multi_and_on_row.out === 1;
+    multi_and_on_row.out === 1; */
 
-    signal valid_sum_across_row_and_column <== multi_and_on_row.out * multi_and_on_column.out;
+    /* signal valid_sum_across_row_and_column <== multi_and_on_row.out * multi_and_on_column.out;
     out <== validate_cells.out * valid_sum_across_row_and_column;
-    out === 1;
+    out === 1; */
     
 }
 
